@@ -4,22 +4,24 @@ Projeto desenvolvido na disciplina de Plataformas de Prototipação para IoT
 # Materiais utilizados
 
 🔌 Hardware
-ESP32
+-> ESP32
+-> Módulo GPS NEO-6M
+-> Sensor de obstáculo (infravermelho)
+-> Display OLED (I2C)
+-> Buzzer (ativo/passivo)
+-> LEDs (indicadores visuais)
+-> Botões (controle do sistema)
+-> Protoboard
+-> Jumpers (cabos de conexão)
+-> Suporte para pilhas AAA
 
-Módulo GPS NEO-6M
-
-Sensor de obstáculo (infravermelho)
-
-Display OLED (I2C)
-
-Buzzer (ativo/passivo)
-
-LEDs (indicadores visuais)
-
-Botões (controle do sistema)
-
-Protoboard
-
-Jumpers (cabos de conexão)
-
-Suporte para pilhas AAA
+💻 Software e Tecnologias
+-> Amazon Web Services (AWS)
+-> Ubuntu (Servidor Linux)
+-> Node-RED
+--> Node-RED Dashboard
+--> Node-RED Worldmap
+-> MySQL
+-> Apache HTTP Server
+-> MQTT (Mosquitto)
+-> Arduino IDE
