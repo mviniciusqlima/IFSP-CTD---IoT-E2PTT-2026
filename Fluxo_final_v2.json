@@ -1,0 +1,609 @@
+[
+    {
+        "id": "d4ee9751039cadd3",
+        "type": "tab",
+        "label": "Fluxo 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "6a6c00fc3a79acf5",
+        "type": "worldmap",
+        "z": "d4ee9751039cadd3",
+        "name": "Mapa de obstáculos",
+        "lat": "",
+        "lon": "",
+        "zoom": "17",
+        "layer": "EsriS",
+        "cluster": "0",
+        "maxage": "",
+        "usermenu": "show",
+        "layers": "show",
+        "panit": "true",
+        "panlock": "false",
+        "zoomlock": "false",
+        "hiderightclick": "false",
+        "coords": "none",
+        "showgrid": "false",
+        "showruler": "true",
+        "allowFileDrop": "false",
+        "path": "/worldmap",
+        "overlist": "DR,CO,BU",
+        "maplist": "OSMC,EsriS",
+        "mapname": "",
+        "mapurl": "",
+        "mapopt": "",
+        "mapwms": false,
+        "x": 820,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "mqtt_in_gps",
+        "type": "mqtt in",
+        "z": "d4ee9751039cadd3",
+        "name": "Receber GPS ESP32",
+        "topic": "iot/gps",
+        "qos": "2",
+        "datatype": "auto",
+        "broker": "b349a5235f9a0506",
+        "nl": false,
+        "rap": false,
+        "inputs": 0,
+        "x": 180,
+        "y": 60,
+        "wires": [
+            [
+                "json_parser"
+            ]
+        ]
+    },
+    {
+        "id": "json_parser",
+        "type": "json",
+        "z": "d4ee9751039cadd3",
+        "name": "Converter JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 180,
+        "y": 160,
+        "wires": [
+            [
+                "debug_payload",
+                "function_sql",
+                "94c91dd088f5054e",
+                "a42e675f19989f98"
+            ]
+        ]
+    },
+    {
+        "id": "function_sql",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "Montar SQL",
+        "func": "let data = msg.payload;\n\nif(!data.lat || !data.lon){\n node.warn(\"Mensagem inválida recebida\");\n return null;\n}\n\n// cria data do evento\nlet agora = new Date();\n\n// guarda dados para usar depois\nmsg.gps = {\n    id: \"ESP32\",\n    lat: data.lat,\n    lon: data.lon,\n    evento: data.evento,\n    data_evento: agora\n};\n\n// envia também para o banco\nmsg.topic = \"INSERT INTO eventos (dispositivo, latitude, longitude, evento, data_evento) VALUES ('ESP32',\" \n + data.lat + \",\" + data.lon + \",'\" + data.evento + \"','\" + agora.toISOString().slice(0,19).replace('T',' ') + \"')\";\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 160,
+        "wires": [
+            [
+                "mysql_db"
+            ]
+        ]
+    },
+    {
+        "id": "debug_payload",
+        "type": "debug",
+        "z": "d4ee9751039cadd3",
+        "name": "Ver dados recebidos",
+        "active": true,
+        "tosidebar": true,
+        "complete": "payload",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 380,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "mysql_db",
+        "type": "mysql",
+        "z": "d4ee9751039cadd3",
+        "mydb": "mysql_iot",
+        "name": "Salvar no banco",
+        "x": 420,
+        "y": 220,
+        "wires": [
+            [
+                "a9d4e4f543ae69df",
+                "20cf45a335eb0db4"
+            ]
+        ]
+    },
+    {
+        "id": "debug_sql",
+        "type": "debug",
+        "z": "d4ee9751039cadd3",
+        "name": "SQL executado",
+        "active": true,
+        "tosidebar": true,
+        "complete": "topic",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "a9d4e4f543ae69df",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "Monta mapa",
+        "func": "let row = msg.gps;\n\n// pega último ponto salvo\nlet ultimo = flow.get(\"ultimoPonto\");\n\n// se existir último ponto, manda ele como histórico\nif (ultimo) {\n    node.send({\n        payload: {\n            name: \"hist_\" + Date(),\n            lat: ultimo.lat,\n            lon: ultimo.lon,\n            layer: \"Histórico\",\n            icon: \"circle\",\n            iconColor: \"yellow\",\n            popup: \"Ponto mapeado\"\n        }\n    });\n}\n\n// salva novo ponto como último\nflow.set(\"ultimoPonto\", row);\n\n// envia ponto atual destacado\nmsg.payload = {\n    name: \"ESP32\",\n    lat: row.lat,\n    lon: row.lon,\n    layer: \"GPS\",\n    icon: \"circle\",\n    iconColor: \"red\",\n    popup: \"Último evento: \" + row.evento\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 160,
+        "wires": [
+            [
+                "6a6c00fc3a79acf5",
+                "debug_sql"
+            ]
+        ]
+    },
+    {
+        "id": "305dcdf315b59eb3",
+        "type": "debug",
+        "z": "d4ee9751039cadd3",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 820,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "20cf45a335eb0db4",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "Monta tabela",
+        "func": "let row = msg.gps;\n\n// pega o id que o banco criou\nlet idBanco = msg.payload.insertId;\n\nmsg.payload = {\n    id: idBanco,\n    lat: row.lat,\n    lon: row.lon,\n    evento: row.evento,\n    tempo: new Date(row.data_evento).toLocaleString(\"pt-BR\")\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 220,
+        "wires": [
+            [
+                "f360cdb7ac6c3201",
+                "1f0367d8fa54dbc6",
+                "305dcdf315b59eb3"
+            ]
+        ]
+    },
+    {
+        "id": "f360cdb7ac6c3201",
+        "type": "ui-table",
+        "z": "d4ee9751039cadd3",
+        "group": "d02426c6c0806c97",
+        "name": "",
+        "label": "",
+        "order": 1,
+        "width": 6,
+        "height": 0,
+        "maxrows": "10",
+        "passthru": false,
+        "autocols": true,
+        "showSearch": true,
+        "deselect": true,
+        "selectionType": "none",
+        "columns": [],
+        "mobileBreakpoint": "",
+        "mobileBreakpointType": "none",
+        "action": "append",
+        "className": "",
+        "x": 790,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "1f0367d8fa54dbc6",
+        "type": "ui-template",
+        "z": "d4ee9751039cadd3",
+        "group": "d02426c6c0806c97",
+        "page": "",
+        "ui": "",
+        "name": "Página HTML",
+        "order": 2,
+        "width": 6,
+        "height": "",
+        "head": "",
+        "format": "<!DOCTYPE html>\n<html>\n\n<head>\n<meta charset=\"utf-8\">\n<script src=\"./uibuilderfe.min.js\"></script>\n\n<style>\n\nbody{\nmargin:0;\nfont-family:Century Gothic;\n}\n\n#container{\ndisplay:flex;\nheight:100vh;\nalign-items:stretch;\n}\n\n#mapa{\nflex:2;\ndisplay:flex;\n}\n\n#mapa iframe{\nflex:1;\nborder:0;\n}\n\n#tabela{\noverflow-y:auto;\n}\n\n\n\n</style>\n</head>\n\n<body>\n\n<div id=\"container\">\n\n    <div id=\"mapa\">\n        <iframe src=\"/worldmap\"></iframe>\n    </div>\n\n</div>\n\n<script src=\"./index.js\"></script>\n\n<script>\n    if (msg && msg.payload && msg.payload.refresh) {\n    window.location.reload();\n}\n</script>\n\n</body>\n</html>\n",
+        "storeOutMessages": true,
+        "passthru": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 840,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "botao_limpar",
+        "type": "ui-button",
+        "z": "d4ee9751039cadd3",
+        "group": "d02426c6c0806c97",
+        "name": "Limpar BD",
+        "label": "Limpar Banco de Dados",
+        "order": 5,
+        "width": "",
+        "height": "",
+        "emulateClick": false,
+        "className": "",
+        "icon": "delete",
+        "iconPosition": "left",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "",
+        "topicType": "str",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 110,
+        "y": 220,
+        "wires": [
+            [
+                "confirmar_limpeza"
+            ]
+        ]
+    },
+    {
+        "id": "confirmar_limpeza",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "SQL Limpar",
+        "func": "// 1️⃣ limpa o banco\nlet limparBD = {\n    topic: \"TRUNCATE TABLE eventos\"\n};\n\n// 2️⃣ limpa todos os marcadores do mapa (worldmap)\nlet limparMapa = {\n    payload: {\n        command: \"clear\"\n    }\n};\n\n// 3️⃣ zera os contadores do gráfico\nflow.set(\"manual\",0);\nflow.set(\"obstaculo\",0);\n\n// envia gráfico vazio\nlet limparGrafico = {\n    payload: [\n        {evento:\"Manual\", valor:0},\n        {evento:\"Obstáculo\", valor:0}\n    ]\n};\n\n// 4️⃣ envia comando para atualizar página\nlet atualizarPagina = {\n    payload: {\n        refresh: true\n    }\n};\n\nflow.set(\"totalEventos\",0);\n\nlet limparContador = {\n    payload: 0\n};\n\n\nreturn [limparBD, limparMapa, limparGrafico, atualizarPagina, limparContador];\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 170,
+        "y": 280,
+        "wires": [
+            [
+                "debug_limpeza",
+                "mysql_db",
+                "f360cdb7ac6c3201",
+                "1f0367d8fa54dbc6",
+                "94c91dd088f5054e"
+            ]
+        ]
+    },
+    {
+        "id": "debug_limpeza",
+        "type": "debug",
+        "z": "d4ee9751039cadd3",
+        "name": "Banco limpo",
+        "active": true,
+        "tosidebar": true,
+        "x": 150,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "94c91dd088f5054e",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "Calcula porc. eventos",
+        "func": "let evento = msg.payload.evento;\n\nlet manual = flow.get(\"manual\") || 0;\nlet obstaculo = flow.get(\"obstaculo\") || 0;\n\nif(evento === \"manual\"){\n    manual++;\n}\n\nif(evento === \"obstaculo\"){\n    obstaculo++;\n}\n\nflow.set(\"manual\", manual);\nflow.set(\"obstaculo\", obstaculo);\n\nlet total = manual + obstaculo;\n\nlet percManual = total ? (manual/total*100).toFixed(2) : 0;\nlet percObst = total ? (obstaculo/total*100).toFixed(2) : 0;\n\nmsg.payload = [\n    {evento:\"Manual\", valor: percManual},\n    {evento:\"Obstáculo\", valor: percObst}\n];\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 340,
+        "wires": [
+            [
+                "db5e576ee658a44c"
+            ]
+        ]
+    },
+    {
+        "id": "db5e576ee658a44c",
+        "type": "ui-chart",
+        "z": "d4ee9751039cadd3",
+        "group": "d02426c6c0806c97",
+        "name": "",
+        "label": "Porc. da distribuição de Eventos",
+        "order": 3,
+        "chartType": "bar",
+        "category": "evento",
+        "categoryType": "property",
+        "xAxisLabel": "Tipo de identificação",
+        "xAxisProperty": "evento",
+        "xAxisPropertyType": "property",
+        "xAxisType": "category",
+        "xAxisFormat": "",
+        "xAxisFormatType": "auto",
+        "xmin": "",
+        "xmax": "",
+        "yAxisLabel": "Porcentagem da categoria (%)",
+        "yAxisProperty": "valor",
+        "yAxisPropertyType": "property",
+        "ymin": "0",
+        "ymax": "100",
+        "bins": 10,
+        "action": "replace",
+        "stackSeries": true,
+        "pointShape": "circle",
+        "pointRadius": 4,
+        "showLegend": true,
+        "removeOlder": 1,
+        "removeOlderUnit": "3600",
+        "removeOlderPoints": "",
+        "colors": [
+            "#b8b8b8",
+            "#0033ff",
+            "#ff7f0e",
+            "#2ca02c",
+            "#a347e1",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "textColor": [
+            "#666666"
+        ],
+        "textColorDefault": true,
+        "gridColor": [
+            "#e5e5e5"
+        ],
+        "gridColorDefault": true,
+        "width": 5,
+        "height": 12,
+        "className": "",
+        "interpolation": "linear",
+        "x": 770,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "0160cac0e7fbf6ad",
+        "type": "debug",
+        "z": "d4ee9751039cadd3",
+        "name": "Lê valor",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "c106292756851fce",
+        "type": "ui-text",
+        "z": "d4ee9751039cadd3",
+        "group": "d02426c6c0806c97",
+        "order": 4,
+        "width": 7,
+        "height": 12,
+        "name": "",
+        "label": "Número de eventos identificados",
+        "format": "{{msg.payload}}",
+        "layout": "col-center",
+        "style": true,
+        "font": "Century Gothic,CenturyGothic,AppleGothic,sans-serif",
+        "fontSize": "30",
+        "color": "#717171",
+        "wrapText": true,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 600,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "a42e675f19989f98",
+        "type": "function",
+        "z": "d4ee9751039cadd3",
+        "name": "Total de obstáculos identif",
+        "func": "// recupera contador salvo\nlet total = flow.get(\"totalEventos\") || 0;\n\n// incrementa contador\ntotal++;\n\n// salva novamente\nflow.set(\"totalEventos\", total);\n\n// envia para o node de texto\nmsg.payload = total;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 400,
+        "wires": [
+            [
+                "c106292756851fce",
+                "0160cac0e7fbf6ad"
+            ]
+        ]
+    },
+    {
+        "id": "b349a5235f9a0506",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "18.191.112.34",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "mysql_iot",
+        "type": "MySQLdatabase",
+        "name": "Banco IoT",
+        "host": "127.0.0.1",
+        "port": "3306",
+        "db": "iot_obstaculo",
+        "tz": "",
+        "charset": "UTF8"
+    },
+    {
+        "id": "d02426c6c0806c97",
+        "type": "ui-group",
+        "name": "Coleta de dados de obstáculos",
+        "page": "eb48f8422848165c",
+        "width": "14",
+        "height": "1",
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "eb48f8422848165c",
+        "type": "ui-page",
+        "name": "Plataformas de prototipação para Internet das Coisas",
+        "ui": "7e24e24d890b1f4a",
+        "path": "",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "a533d41929de141d",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": true,
+        "disabled": false
+    },
+    {
+        "id": "7e24e24d890b1f4a",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "a533d41929de141d",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#379936",
+            "primary": "#c91518",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#ffffff"
+        },
+        "sizes": {
+            "density": "compact",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "5px"
+        }
+    },
+    {
+        "id": "ace8e84d39f83d04",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-web-worldmap": "5.6.1",
+            "node-red-node-mysql": "3.0.0",
+            "@flowfuse/node-red-dashboard": "1.30.2"
+        }
+    }
+]
